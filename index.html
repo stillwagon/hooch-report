@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f1a14">
+  <title>Hooch Report</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪰</text></svg>">
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js"></script>
+  <style>*{box-sizing:border-box;margin:0;padding:0}html,body,#root{min-height:100vh;background:#0f1a14}body{-webkit-font-smoothing:antialiased}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THEME — Vintage National Park Poster
+// ══════════════════════════════════════════════════════════════════════════════
+
+const T = {
+  bg: "#1a2b1f",       // deep forest
+  bgCard: "#213628",   // slightly lighter
+  bgDeep: "#0f1a14",   // darkest
+  cream: "#f0e4c8",    // warm cream text
+  creamDim: "#c4b898", // muted cream
+  gold: "#d4a340",     // warm gold accent
+  sienna: "#c4613a",   // burnt sienna
+  sage: "#7a9b6d",     // muted sage
+  moss: "#4a6b42",     // moss accent
+  river: "#5a8fa8",    // river blue
+  border: "#2d4a35",   // border green
+  borderLight: "#3a5c42",
+  textMuted: "#6b7f5e",
+  danger: "#c44a2a",
+  success: "#5a9b4a",
+  warn: "#d49a30",
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONFIG & DATA (from v4 — weather scoring, access points, hatches, etc.)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const USGS_GAUGES = {
+  bufordDam: { id: "02334430", label: "Buford Dam" },
+  norcross:  { id: "02335000", label: "Norcross" },
+  atlanta:   { id: "02336000", label: "Atlanta" },
+};
+const PARAM_CODES = { discharge: "00060", waterTemp: "00010" };
+
+const ACCESS_POINTS = [
+  { name:"Buford Dam", shortName:"Buford Dam", riverMile:349, distFromDam:0, travelMinFromDam:0, section:"upper", maxWadeCFS:900, lat:34.158, lon:-84.077, gauge:"bufordDam", quality:7, clarityHrs:12 },
+  { name:"Bowmans Island", shortName:"Bowmans Is.", riverMile:348, distFromDam:1.5, travelMinFromDam:20, section:"upper", maxWadeCFS:900, lat:34.148, lon:-84.083, gauge:"bufordDam", quality:8, clarityHrs:12 },
+  { name:"Highway 20", shortName:"Hwy 20", riverMile:346, distFromDam:3, travelMinFromDam:50, section:"upper", maxWadeCFS:1000, lat:34.125, lon:-84.097, gauge:"bufordDam", quality:9, clarityHrs:18 },
+  { name:"Settles Bridge", shortName:"Settles Br.", riverMile:344, distFromDam:5, travelMinFromDam:100, section:"upper", maxWadeCFS:1100, lat:34.098, lon:-84.110, gauge:"bufordDam", quality:8, clarityHrs:24 },
+  { name:"McGinnis Ferry", shortName:"McGinnis", riverMile:340, distFromDam:9, travelMinFromDam:180, section:"mid", maxWadeCFS:1200, lat:34.052, lon:-84.098, gauge:"norcross", quality:5, clarityHrs:48 },
+  { name:"Abbotts Bridge", shortName:"Abbotts Br.", riverMile:335, distFromDam:14, travelMinFromDam:270, section:"mid", maxWadeCFS:1200, lat:34.025, lon:-84.172, gauge:"norcross", quality:6, clarityHrs:48 },
+  { name:"Medlock Bridge", shortName:"Medlock Br.", riverMile:331, distFromDam:18, travelMinFromDam:330, section:"mid", maxWadeCFS:1200, lat:33.996, lon:-84.202, gauge:"norcross", quality:6, clarityHrs:48 },
+  { name:"Jones Bridge", shortName:"Jones Br.", riverMile:328, distFromDam:21, travelMinFromDam:390, section:"mid", maxWadeCFS:1200, lat:34.001, lon:-84.235, gauge:"norcross", quality:8, clarityHrs:48 },
+  { name:"Island Ford", shortName:"Island Ford", riverMile:320, distFromDam:29, travelMinFromDam:510, section:"mid", maxWadeCFS:1200, lat:33.973, lon:-84.264, gauge:"norcross", quality:6, clarityHrs:60 },
+  { name:"Morgan Falls DH", shortName:"Morgan Falls", riverMile:313, distFromDam:36, travelMinFromDam:-1, section:"lower", maxWadeCFS:1500, lat:33.965, lon:-84.382, gauge:"atlanta", quality:7, clarityHrs:60 },
+  { name:"Johnson Ferry", shortName:"Johnson Fy.", riverMile:311, distFromDam:38, travelMinFromDam:-1, section:"lower", maxWadeCFS:1500, lat:33.945, lon:-84.404, gauge:"atlanta", quality:5, clarityHrs:60 },
+  { name:"Powers Island", shortName:"Powers Is.", riverMile:307, distFromDam:42, travelMinFromDam:-1, section:"lower", maxWadeCFS:1800, lat:33.904, lon:-84.442, gauge:"atlanta", quality:6, clarityHrs:72 },
+  { name:"Paces Mill", shortName:"Paces Mill", riverMile:304, distFromDam:45, travelMinFromDam:-1, section:"lower", maxWadeCFS:1800, lat:33.870, lon:-84.452, gauge:"atlanta", quality:4, clarityHrs:72 },
+];
+
+// Hatch data with conditions-specific fly recs (carried from v4)
+const HATCHES = [
+  { name:"Midges", months:[1,2,3,4,5,6,7,8,9,10,11,12], peak:[1,2,3,11,12], sizes:"18–24", color:T.river,
+    flies: {
+      overcast:{patterns:["Griffith's Gnat #20","Zebra Midge (black)","Blue Assassin #22"],tip:"Peak dry fly window. Look for risers in film."},
+      sunny:{patterns:["Zebra Midge (copper) #22","Brassie #24","Serendipity"],tip:"Go smaller, deeper. 6X–7X tippet."},
+      cold:{patterns:["Blood Midge (red) #22","Thread Midge #24","Blue Assassin"],tip:"Dead-drift deep. Midday warmest = best window."},
+      stained:{patterns:["Zebra Midge (black) #18","San Juan Worm #12","Egg Pattern"],tip:"Go bigger, darker. Worm as attractor, midge dropper."},
+    }},
+  { name:"BWO", months:[1,2,3,4,5,9,10,11,12], peak:[2,3,4,10,11], sizes:"14–24", color:"#7ba4c9",
+    flies: {
+      overcast:{patterns:["CDC BWO Emerger #20","Parachute Adams #18","RS2 #22"],tip:"THIS is BWO weather. Emergers in the film are devastating."},
+      sunny:{patterns:["Sparkle Dun #20","Pheasant Tail #18","WD-40 #22"],tip:"Light hatch in sun. Nymph-focused, fish shaded seams."},
+      cold:{patterns:["Parachute Adams #20","Flashback PT #18"],tip:"Narrow window — midday 11am–2pm. Emergers just under surface."},
+      stained:{patterns:["Beadhead PT #16","Hare's Ear #14"],tip:"Size up, heavier nymphs. High-vis indicator."},
+    }},
+  { name:"Caddis", months:[3,4,5,6,9,10,11], peak:[4,5,10], sizes:"14–20", color:T.sage,
+    flies: {
+      overcast:{patterns:["Elk Hair Caddis #16","X-Caddis #18","Soft Hackle"],tip:"Swing soft hackles through riffles at dusk."},
+      sunny:{patterns:["Elk Hair Caddis #18","Prince Nymph #14"],tip:"Caddis less light-shy than mayflies. Evening is prime."},
+      cold:{patterns:["Green Caddis Larva #16","Hare's Ear #16"],tip:"Fish larvae deep. Will turn on fast above 50°F."},
+      stained:{patterns:["Beadhead Hare's Ear #12","Prince Nymph #12"],tip:"Larger nymphs tolerate dirty water better than mayflies."},
+    }},
+  { name:"Stoneflies", months:[2,3,4,5,6], peak:[3,4], sizes:"4–16", color:T.sienna,
+    flies: {
+      overcast:{patterns:["Stimulator #12","Pat's Stonefly #8"],tip:"Fish riffles and runs with heavy nymphs."},
+      sunny:{patterns:["Yellow Stimulator #12","Kaufmann's Stone #8"],tip:"Stones productive all day in fast rocky water."},
+      cold:{patterns:["Black Stonefly Nymph #14"],tip:"Little black stones active even in cold. Tight-line nymph."},
+      stained:{patterns:["Pat's Rubber Legs #6","Stonefly Nymph #8"],tip:"Big, heavy — perfect for high, stained flows."},
+    }},
+  { name:"Terrestrials", months:[6,7,8,9], peak:[7,8], sizes:"8–16", color:"#c47a3a",
+    flies: {
+      overcast:{patterns:["Foam Ant #14","Beetle #14"],tip:"Fish tight to banks and overhanging vegetation."},
+      sunny:{patterns:["Dave's Hopper #10","Foam Ant #14","Japanese Beetle"],tip:"Hot sun = bugs falling in. Loud splat presentations."},
+      cold:{patterns:[],tip:"Wrong season for terrestrials."},
+      stained:{patterns:["Foam Hopper #10"],tip:"Big foam — trout key on silhouette and splat."},
+    }},
+  { name:"Streamers", months:[1,2,3,11,12], peak:[1,12], sizes:"4–12", color:"#9b6abf",
+    flies: {
+      overcast:{patterns:["Woolly Bugger (olive) #6","Sculpin #8"],tip:"Strip-and-pause through pools and along structure."},
+      sunny:{patterns:["Woolly Bugger (black) #8","Zonker #6"],tip:"Fish shade, deep pools, undercuts."},
+      cold:{patterns:["White Woolly Bugger #4","Bunny Strip (pearl)"],tip:"TROPHY WATER. Cold-snap baitfish kills. Dead-drift white on sink-tip."},
+      stained:{patterns:["Black Woolly Bugger #4","Egg-Sucking Leech"],tip:"STREAMER WATER. Go big, dark, slow. Trout hunt by vibration."},
+    }},
+];
+
+// ── KNOT GUIDE DATA ─────────────────────────────────────────────────────────
+
+const KNOTS = [
+  { category: "Line to Leader", knots: [
+    { name: "Nail Knot", use: "Attach leader butt to fly line", steps: "1. Lay fly line and leader parallel with a small tube alongside. 2. Wrap leader around line and tube 5–6 times. 3. Thread leader through tube, remove tube. 4. Pull both ends to tighten. Trim." },
+    { name: "Loop-to-Loop", use: "Quick-change leader connection", steps: "1. Form a perfection loop in leader butt and fly line. 2. Pass leader loop through line loop. 3. Thread leader through its own loop. 4. Pull snug — interlocking loops." },
+  ]},
+  { category: "Leader to Tippet", knots: [
+    { name: "Surgeon's Knot", use: "Quick, strong — works with different diameters", steps: "1. Overlap leader and tippet 6 inches. 2. Form a simple overhand loop with both strands. 3. Pass the tag ends through the loop twice (double surgeon's). 4. Moisten and pull all four ends tight. Trim tags." },
+    { name: "Blood Knot", use: "Clean, slim profile for tapered leaders", steps: "1. Overlap ends 6 inches. 2. Wrap one tag around the other 5 times. 3. Bring tag through the gap between the lines. 4. Repeat wraps in opposite direction with other tag. 5. Thread through same gap, opposite side. 6. Moisten, pull mainlines to tighten." },
+  ]},
+  { category: "Tippet to Fly", knots: [
+    { name: "Improved Clinch", use: "Most common fly knot — reliable on small hooks", steps: "1. Thread tippet through hook eye. 2. Wrap tag around standing line 5–7 times. 3. Thread tag through small loop near eye. 4. Thread tag through large loop just formed. 5. Moisten and pull tight. Trim." },
+    { name: "Davy Knot", use: "Fast, minimal waste — competition favorite", steps: "1. Thread tippet through eye. 2. Form a simple loop around the standing line. 3. Pass tag through the loop. 4. Pull standing line to tighten against eye. Trim close." },
+  ]},
+  { category: "Dropper Rigs", knots: [
+    { name: "Surgeon's Loop Dropper", use: "Attach a dropper fly off the main tippet", steps: "1. Tie a surgeon's knot mid-tippet but leave the tag end long (8–12 inches). 2. Attach your dropper fly to the tag end with a clinch knot. 3. The tag extends perpendicular to the main tippet." },
+    { name: "Hook-Bend Dropper", use: "Simplest dropper — tie off the hook bend", steps: "1. Tie your point fly to the tippet normally. 2. Tie 12–18 inches of tippet to the bend of the point fly hook using a clinch knot. 3. Attach your dropper fly to the free end." },
+  ]},
+];
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LOGO SVG
+// ══════════════════════════════════════════════════════════════════════════════
+
+function Logo({size=140}) {
+  return (
+    <svg viewBox="0 0 280 100" width={size} style={{display:"block"}}>
+      {/* Border frame */}
+      <rect x="2" y="2" width="276" height="96" rx="6" fill="none" stroke={T.gold} strokeWidth="2"/>
+      <rect x="6" y="6" width="268" height="88" rx="4" fill="none" stroke={T.gold} strokeWidth="0.5" opacity="0.5"/>
+      {/* Mountain silhouette */}
+      <polygon points="20,70 50,35 65,50 90,25 115,55 130,45 150,70" fill={T.moss} opacity="0.6"/>
+      <polygon points="30,70 60,42 80,55 100,30 120,58 140,70" fill={T.sage} opacity="0.4"/>
+      {/* River line */}
+      <path d="M 18,72 Q 50,65 80,72 Q 110,79 140,70 Q 160,64 180,72 Q 210,80 240,70 Q 255,66 270,72" fill="none" stroke={T.river} strokeWidth="2" opacity="0.7"/>
+      <path d="M 18,76 Q 55,70 85,76 Q 115,82 145,74 Q 170,68 195,76 Q 220,82 250,74 Q 262,70 270,76" fill="none" stroke={T.river} strokeWidth="1" opacity="0.4"/>
+      {/* Fly icon */}
+      <g transform="translate(22,18) scale(0.7)">
+        <ellipse cx="10" cy="12" rx="4" ry="6" fill={T.gold} opacity="0.8" transform="rotate(-20,10,12)"/>
+        <line x1="8" y1="18" x2="14" y2="6" stroke={T.cream} strokeWidth="1"/>
+        <path d="M 6,8 Q 2,3 8,2" fill="none" stroke={T.cream} strokeWidth="0.7"/>
+        <path d="M 6,8 Q 0,5 4,1" fill="none" stroke={T.cream} strokeWidth="0.7"/>
+      </g>
+      {/* Text */}
+      <text x="160" y="32" textAnchor="middle" fontFamily="'Playfair Display',Georgia,serif" fontSize="20" fontWeight="700" fill={T.cream} letterSpacing="3">HOOCH</text>
+      <text x="160" y="50" textAnchor="middle" fontFamily="'Playfair Display',Georgia,serif" fontSize="13" fontWeight="400" fill={T.gold} letterSpacing="6">REPORT</text>
+      <line x1="110" y1="55" x2="210" y2="55" stroke={T.gold} strokeWidth="0.5" opacity="0.6"/>
+      <text x="160" y="67" textAnchor="middle" fontFamily="'DM Sans',sans-serif" fontSize="6.5" fill={T.creamDim} letterSpacing="2.5">CHATTAHOOCHEE RIVER</text>
+      <text x="160" y="77" textAnchor="middle" fontFamily="'DM Sans',sans-serif" fontSize="5.5" fill={T.textMuted} letterSpacing="2">FLY FISHING CONDITIONS</text>
+      {/* Est marker */}
+      <text x="160" y="88" textAnchor="middle" fontFamily="'DM Sans',sans-serif" fontSize="5" fill={T.gold} opacity="0.5" letterSpacing="1.5">BUFORD DAM TO PACES MILL · 45 RIVER MILES</text>
+    </svg>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FLY ILLUSTRATION SVGs
+// ══════════════════════════════════════════════════════════════════════════════
+
+function FlySketch({ name, size=48 }) {
+  const s = size;
+  const flyKey = name.toLowerCase();
+
+  // Hook base shape
+  const Hook = ({color="#888"}) => (
+    <path d={`M ${s*0.15},${s*0.35} Q ${s*0.15},${s*0.75} ${s*0.5},${s*0.8} Q ${s*0.85},${s*0.85} ${s*0.85},${s*0.55} L ${s*0.85},${s*0.35}`} fill="none" stroke={color} strokeWidth={1.2} strokeLinecap="round"/>
+  );
+
+  const HookPoint = () => (
+    <path d={`M ${s*0.15},${s*0.35} L ${s*0.08},${s*0.25}`} stroke="#999" strokeWidth={0.8} strokeLinecap="round"/>
+  );
+
+  if (flyKey.includes("griffith") || flyKey.includes("gnat")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#666"/><HookPoint/>
+      <ellipse cx={s*0.5} cy={s*0.55} rx={s*0.18} ry={s*0.12} fill="#4a4a4a" opacity="0.8"/>
+      {/* Hackle wraps */}
+      {[0.35,0.45,0.55,0.65].map((x,i)=><ellipse key={i} cx={s*x} cy={s*0.5} rx={s*0.12} ry={s*0.18} fill="none" stroke="#7a7a6a" strokeWidth={0.5} opacity={0.6}/>)}
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Griffith's Gnat</text>
+    </svg>;
+  }
+  if (flyKey.includes("zebra") || flyKey.includes("midge")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#555"/><HookPoint/>
+      {/* Wrapped body */}
+      {[0.3,0.4,0.5,0.6,0.7].map((y,i)=><line key={i} x1={s*0.4} y1={s*y} x2={s*0.7} y2={s*y} stroke="#c0c0c0" strokeWidth={1.5} opacity={0.7}/>)}
+      <circle cx={s*0.55} cy={s*0.28} r={s*0.06} fill="#c0c0c0"/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Zebra Midge</text>
+    </svg>;
+  }
+  if (flyKey.includes("adams") || flyKey.includes("parachute")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#665544"/><HookPoint/>
+      {/* Post */}
+      <line x1={s*0.55} y1={s*0.45} x2={s*0.55} y2={s*0.15} stroke="white" strokeWidth={1.5}/>
+      {/* Hackle disc */}
+      <ellipse cx={s*0.55} cy={s*0.35} rx={s*0.2} ry={s*0.06} fill="none" stroke="#8b7355" strokeWidth={0.8}/>
+      {/* Body */}
+      <ellipse cx={s*0.5} cy={s*0.58} rx={s*0.12} ry={s*0.15} fill="#6b5b4a" opacity="0.8"/>
+      {/* Tail */}
+      <line x1={s*0.3} y1={s*0.7} x2={s*0.1} y2={s*0.85} stroke="#8b7355" strokeWidth={0.6}/>
+      <line x1={s*0.3} y1={s*0.7} x2={s*0.15} y2={s*0.9} stroke="#8b7355" strokeWidth={0.6}/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Parachute Adams</text>
+    </svg>;
+  }
+  if (flyKey.includes("elk") || flyKey.includes("caddis")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#665544"/><HookPoint/>
+      {/* Tent wing */}
+      <path d={`M ${s*0.3},${s*0.45} L ${s*0.6},${s*0.25} L ${s*0.85},${s*0.45}`} fill="#b8a070" opacity="0.7" stroke="#a08850" strokeWidth={0.5}/>
+      {/* Body */}
+      <ellipse cx={s*0.5} cy={s*0.55} rx={s*0.1} ry={s*0.16} fill="#5a4a2a" opacity="0.9"/>
+      {/* Hackle */}
+      <ellipse cx={s*0.4} cy={s*0.45} rx={s*0.14} ry={s*0.08} fill="none" stroke="#8b7355" strokeWidth={0.6}/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Elk Hair Caddis</text>
+    </svg>;
+  }
+  if (flyKey.includes("pheasant") || flyKey.includes("tail") || flyKey.includes("pt")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#8b6914"/><HookPoint/>
+      {/* Bead head */}
+      <circle cx={s*0.65} cy={s*0.33} r={s*0.06} fill={T.gold}/>
+      {/* Slim body */}
+      <line x1={s*0.3} y1={s*0.72} x2={s*0.62} y2={s*0.38} stroke="#6b4a2a" strokeWidth={2.5} strokeLinecap="round"/>
+      {/* Ribbing */}
+      {[0.4,0.5,0.6].map((t,i)=>{const x=s*(0.3+t*0.32),y=s*(0.72-t*0.34);return <line key={i} x1={x-2} y1={y-2} x2={x+2} y2={y+2} stroke={T.gold} strokeWidth={0.5} opacity={0.6}/>;})}
+      {/* Tail fibers */}
+      <line x1={s*0.28} y1={s*0.73} x2={s*0.1} y2={s*0.82} stroke="#8b6914" strokeWidth={0.5}/>
+      <line x1={s*0.28} y1={s*0.73} x2={s*0.12} y2={s*0.88} stroke="#8b6914" strokeWidth={0.5}/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Pheasant Tail</text>
+    </svg>;
+  }
+  if (flyKey.includes("woolly") || flyKey.includes("bugger") || flyKey.includes("streamer")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#333"/><HookPoint/>
+      {/* Marabou tail */}
+      <path d={`M ${s*0.25},${s*0.7} Q ${s*0.05},${s*0.75} ${s*0.02},${s*0.9}`} fill="none" stroke="#2a2a2a" strokeWidth={2} opacity={0.6}/>
+      <path d={`M ${s*0.25},${s*0.7} Q ${s*0.1},${s*0.8} ${s*0.08},${s*0.95}`} fill="none" stroke="#3a3a3a" strokeWidth={1.5} opacity={0.5}/>
+      {/* Chenille body */}
+      <ellipse cx={s*0.5} cy={s*0.55} rx={s*0.2} ry={s*0.13} fill="#2a2a2a" opacity="0.9"/>
+      {/* Palmered hackle */}
+      {[0.35,0.45,0.55,0.65].map((x,i)=><ellipse key={i} cx={s*x} cy={s*0.5} rx={s*0.08} ry={s*0.16} fill="none" stroke="#4a4a4a" strokeWidth={0.5}/>)}
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Woolly Bugger</text>
+    </svg>;
+  }
+  if (flyKey.includes("worm") || flyKey.includes("san juan")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#8b2020"/><HookPoint/>
+      <path d={`M ${s*0.15},${s*0.65} Q ${s*0.35},${s*0.35} ${s*0.5},${s*0.55} Q ${s*0.65},${s*0.75} ${s*0.85},${s*0.45}`} fill="none" stroke="#c43030" strokeWidth={3} strokeLinecap="round"/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">San Juan Worm</text>
+    </svg>;
+  }
+  if (flyKey.includes("stimulator") || flyKey.includes("stone")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#8b6914"/><HookPoint/>
+      <path d={`M ${s*0.3},${s*0.4} L ${s*0.65},${s*0.2} L ${s*0.85},${s*0.4}`} fill="#c49030" opacity="0.5" stroke="#a07020" strokeWidth={0.5}/>
+      <ellipse cx={s*0.5} cy={s*0.55} rx={s*0.15} ry={s*0.12} fill="#c47a20" opacity="0.8"/>
+      {[0.38,0.48,0.58].map((x,i)=><ellipse key={i} cx={s*x} cy={s*0.48} rx={s*0.1} ry={s*0.14} fill="none" stroke="#b08030" strokeWidth={0.5}/>)}
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Stimulator</text>
+    </svg>;
+  }
+  if (flyKey.includes("prince")) {
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#333"/><HookPoint/>
+      <circle cx={s*0.65} cy={s*0.33} r={s*0.06} fill={T.gold}/>
+      <line x1={s*0.3} y1={s*0.72} x2={s*0.62} y2={s*0.38} stroke="#2a1a3a" strokeWidth={2.5} strokeLinecap="round"/>
+      {/* White biots */}
+      <line x1={s*0.55} y1={s*0.42} x2={s*0.75} y2={s*0.2} stroke="white" strokeWidth={0.8}/>
+      <line x1={s*0.55} y1={s*0.42} x2={s*0.4} y2={s*0.2} stroke="white" strokeWidth={0.8}/>
+      <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.14} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">Prince Nymph</text>
+    </svg>;
+  }
+  // Generic fallback
+  return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><Hook color="#666"/><HookPoint/>
+    <ellipse cx={s*0.5} cy={s*0.55} rx={s*0.15} ry={s*0.12} fill="#6a6a5a" opacity="0.7"/>
+    <text x={s*0.5} y={s*0.98} textAnchor="middle" fontSize={s*0.12} fill={T.creamDim} fontFamily="'DM Sans',sans-serif">{name.slice(0,18)}</text>
+  </svg>;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEATHER & SCORING (from v4)
+// ══════════════════════════════════════════════════════════════════════════════
+
+function scoreDayWeather(d) {
+  let s=5;const fm=d.tempMax-(d.windMax>10?(d.windMax-10)*0.5:0);
+  if(fm>=42&&fm<=65)s+=2;else if(fm>=35&&fm<=75)s+=1;else if(fm<30)s-=3;else if(fm<35)s-=1;
+  if(d.windMax<=8)s+=2;else if(d.windMax<=12)s+=1;else if(d.windMax>15&&d.windMax<=20)s-=2;else if(d.windMax>20)s-=4;
+  if(d.cloudCover>=60&&d.cloudCover<=90)s+=1.5;else if(d.cloudCover>=40)s+=1;
+  if(d.precip>1)s-=4;else if(d.precip>0.5)s-=2;else if(d.precip>0.1)s-=0.5;else s+=0.5;
+  if(d.weatherCode>=95)s-=3;else if(d.weatherCode>=66&&d.weatherCode<=77)s-=1.5;
+  if(d.precipPrior24h>1)s-=2;else if(d.precipPrior24h>0.5)s-=1;
+  if(d.precipPrior48h>2)s-=1.5;else if(d.precipPrior48h>1)s-=0.5;
+  if(d.precipPrior24h>0.3&&d.precip<0.1&&d.cloudCover<50)s+=0.5;
+  return{score:Math.max(0,Math.min(10,s)),feelsMax:fm};
+}
+
+function condKey(cloud,precip,pPrior,temp,wind){
+  const fm=temp-(wind>10?(wind-10)*0.5:0);
+  if(pPrior>0.5||precip>0.3)return"stained";if(fm<38)return"cold";if(cloud>=60)return"overcast";return"sunny";
+}
+
+function clarity(p24,p48,sec){
+  if(p48<0.1)return{label:"Clear",color:T.success};
+  if(p24>1)return{label:"Blown",color:T.danger};
+  if(p24>0.5)return{label:"Stained",color:T.sienna};
+  if(p48>0.5)return{label:"Clearing",color:T.warn};
+  return{label:"Slight color",color:T.sage};
+}
+
+// ── DATA FETCHING ───────────────────────────────────────────────────────────
+
+async function fetchUSGS(siteId,paramCd){try{const r=await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${siteId}&parameterCd=${paramCd}&period=P1D&siteStatus=all`);const d=await r.json();return d?.value?.timeSeries?.[0]?.values?.[0]?.value||null;}catch{return null;}}
+async function fetchWeather(){try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-84.14&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code,cloud_cover&hourly=temperature_2m,precipitation,wind_speed_10m,cloud_cover,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,weather_code,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=7&past_days=2`);return await r.json();}catch{return null;}}
+
+const wxIcon=c=>{if(c===0)return"☀️";if(c<=3)return"⛅";if(c<=48)return"🌫️";if(c<=67)return"🌧️";if(c<=77)return"❄️";if(c<=82)return"🌦️";if(c>=95)return"⛈️";return"🌤️";};
+const wxLabel=c=>{if(c===0)return"Clear";if(c<=3)return"Partly cloudy";if(c<=48)return"Fog";if(c<=67)return"Rain";if(c<=77)return"Snow/sleet";if(c<=82)return"Showers";if(c>=95)return"T-storms";return"Fair";};
+const fmtTime=d=>{try{return new Date(d).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});}catch{return"—";}};
+const fmtShort=m=>{if(m===-1)return"N/A";if(m===0)return"At dam";if(m<60)return`${m}m`;const h=Math.floor(m/60),r=m%60;return r?`${h}h${r}m`:`${h}h`;};
+function trendOf(v){if(!v||v.length<4)return{arrow:"─",label:"Stable",t:"stable"};const r=v.slice(-8).map(x=>parseFloat(x.value)),d=r[r.length-1]-r[0],rt=d/r.length;if(rt>15)return{arrow:"↑↑",label:"Rising fast",t:"rising-fast"};if(rt>3)return{arrow:"↑",label:"Rising",t:"rising"};if(rt<-15)return{arrow:"↓↓",label:"Falling fast",t:"falling-fast"};if(rt<-3)return{arrow:"↓",label:"Falling",t:"falling"};return{arrow:"─",label:"Stable",t:"stable"};}
+function cfsToStatus(cfs,max){if(cfs===null)return{label:"No Data",color:"#555",score:0};if(cfs<=max*0.65)return{label:"Ideal",color:T.success,score:10};if(cfs<=max*0.85)return{label:"Good",color:T.sage,score:7};if(cfs<=max)return{label:"Fishable",color:T.warn,score:4};if(cfs<=max*1.3)return{label:"Caution",color:T.sienna,score:1};return{label:"Blown",color:T.danger,score:0};}
+function haversine(a,b,c,d){const R=3959,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function nearestPt(lat,lon){let b=null,bd=Infinity;for(const p of ACCESS_POINTS){const d=haversine(lat,lon,p.lat,p.lon);if(d<bd){bd=d;b=p;}}return{point:b,dist:bd};}
+
+const Dot = ({color,size=10,pulse}) => <span style={{display:"inline-block",width:size,height:size,borderRadius:"50%",backgroundColor:color,boxShadow:`0 0 ${size}px ${color}88`,animation:pulse?"pulse 1.8s infinite":"none"}}/>;
+
+function Spark({values,maxWade,w=100,h=26}) {
+  if(!values||values.length<2) return null;
+  const nums=values.map(v=>parseFloat(v.value)).filter(n=>!isNaN(n)).slice(-60);
+  if(nums.length<2) return null;
+  const mn=Math.min(...nums)*0.9,mx=Math.max(...nums,maxWade)*1.1,rng=mx-mn||1;
+  const pts=nums.map((v,i)=>`${(i/(nums.length-1))*w},${h-((v-mn)/rng)*h}`).join(" ");
+  const ty=h-((maxWade-mn)/rng)*h;
+  return <svg width={w} height={h} style={{display:"block"}}><line x1={0} y1={ty} x2={w} y2={ty} stroke={T.warn+"33"} strokeWidth={1} strokeDasharray="3,3"/><polyline points={pts} fill="none" stroke={T.sage} strokeWidth={1.5} strokeLinejoin="round"/><circle cx={w} cy={h-((nums[nums.length-1]-mn)/rng)*h} r={2} fill={T.sage}/></svg>;
+}
+
+function buildWeekForecast(w){
+  if(!w?.daily)return[];const{daily}=w;const td=new Date();td.setHours(0,0,0,0);
+  return daily.time.map((ds,i)=>{
+    const dt=new Date(ds+"T12:00:00"),dn=dt.toLocaleDateString("en-US",{weekday:"short"}),dl=dt.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    const isT=dt.toDateString()===td.toDateString(),isTm=dt.toDateString()===new Date(td.getTime()+864e5).toDateString(),isP=dt<td;
+    const p24=i>0?daily.precipitation_sum[i-1]:0,p48=(i>1?daily.precipitation_sum[i-2]:0)+p24;
+    let ac=50;if(w.hourly){const dh=w.hourly.time.map((t,hi)=>({t:new Date(t),c:w.hourly.cloud_cover[hi]})).filter(h=>h.t.toDateString()===dt.toDateString()&&h.t.getHours()>=7&&h.t.getHours()<=17);if(dh.length)ac=dh.reduce((s,h)=>s+h.c,0)/dh.length;}
+    const dd={tempMax:daily.temperature_2m_max[i],tempMin:daily.temperature_2m_min[i],precip:daily.precipitation_sum[i],precipPrior24h:p24,precipPrior48h:p48,windMax:daily.wind_speed_10m_max[i],cloudCover:ac,weatherCode:daily.weather_code[i]};
+    const{score,feelsMax}=scoreDayWeather(dd);
+    const ck=condKey(ac,dd.precip,p24,dd.tempMax,dd.windMax);
+    return{dateStr:ds,date:dt,dayName:dn,dateLabel:dl,isToday:isT,isTomorrow:isTm,isPast:isP,...dd,feelsMax,score,conditionKey:ck,avgCloud:ac,clarity:{upper:clarity(p24,p48,"upper"),mid:clarity(p24,p48,"mid"),lower:clarity(p24,p48,"lower")}};
+  }).filter(d=>!d.isPast);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GPS ALERT SYSTEM (from v3)
+// ══════════════════════════════════════════════════════════════════════════════
+
+function GpsPanel({gaugeData,schedule}){
+  const[on,setOn]=useState(false),[pos,setPos]=useState(null),[wid,setWid]=useState(null),[alert,setAlert]=useState(null),[notif,setNotif]=useState("default");
+  const prev=useRef(null),fired=useRef(false);
+  const start=()=>{if(!navigator.geolocation)return;if("Notification"in window)Notification.requestPermission().then(p=>setNotif(p));const id=navigator.geolocation.watchPosition(p=>setPos({lat:p.coords.latitude,lon:p.coords.longitude}),e=>console.error(e),{enableHighAccuracy:true,timeout:15000,maximumAge:30000});setWid(id);setOn(true);};
+  const stop=()=>{if(wid!==null)navigator.geolocation.clearWatch(wid);setOn(false);setPos(null);setAlert(null);fired.current=false;};
+
+  useEffect(()=>{
+    if(!on||!pos)return;const dis=gaugeData?.bufordDam?.discharge;if(!dis||dis.length<4)return;
+    const cfs=parseFloat(dis[dis.length-1].value);prev.current=cfs;
+    const{point}=nearestPt(pos.lat,pos.lon);const eta=point.travelMinFromDam;if(eta===-1)return;
+    const vals=dis.slice(-6).map(v=>parseFloat(v.value)),rate=(vals[vals.length-1]-vals[0])/vals.length;
+    if(cfs>800&&rate>5&&!fired.current){
+      fired.current=true;setAlert({msg:`Dam generating! ${Math.round(cfs)} CFS. Water reaches ${point.shortName} (RM ${point.riverMile}) in ~${eta} min.`,eta,t:Date.now()});
+      if(notif==="granted")try{new Notification("⚠️ Dam Release",{body:`Water reaches you in ~${eta} min`,tag:"hooch"});}catch{}
+    }else if(cfs<700&&fired.current){fired.current=false;setAlert(null);}
+  },[on,pos,gaugeData,schedule,notif]);
+
+  const nr=pos?nearestPt(pos.lat,pos.lon):null;
+  return(
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:12,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span style={{fontSize:15}}>{on?"📍":"📡"}</span>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,fontFamily:"'Playfair Display',serif",color:on?T.success:T.cream}}>{on?"On-River Mode":"On-River Mode"}</div>
+            <div style={{fontSize:9,color:T.textMuted}}>{on&&nr?`Near ${nr.point.shortName} · RM ${nr.point.riverMile} · Pulse ETA: ${fmtShort(nr.point.travelMinFromDam)}`:"GPS alerts for dam releases"}</div>
+          </div>
+        </div>
+        <button onClick={on?stop:start} style={{background:on?T.danger+"22":T.success+"22",border:`1px solid ${on?T.danger+"44":T.success+"44"}`,borderRadius:5,color:on?T.sienna:T.success,fontSize:9,padding:"5px 10px",cursor:"pointer",fontWeight:700}}>{on?"Stop":"Start"}</button>
+      </div>
+      {alert&&<Countdown alert={alert}/>}
+    </div>
+  );
+}
+
+function Countdown({alert}){
+  const[el,setEl]=useState(0);
+  useEffect(()=>{const iv=setInterval(()=>setEl(Math.floor((Date.now()-alert.t)/1000)),1000);return()=>clearInterval(iv);},[alert.t]);
+  const rem=Math.max(0,alert.eta*60-el),mm=Math.floor(rem/60),ss=rem%60;
+  return(
+    <div style={{marginTop:10,padding:12,borderRadius:7,background:"linear-gradient(135deg,#3a1510,#2a0a05)",border:`1px solid ${T.danger}44`,animation:"pulse 2s infinite"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{fontSize:12,fontWeight:700,color:T.danger,fontFamily:"'Playfair Display',serif"}}>⚠️ DAM RELEASE DETECTED</div>
+        <div style={{fontSize:26,fontWeight:800,color:T.danger,fontFamily:"'JetBrains Mono',monospace"}}>{mm}:{ss.toString().padStart(2,"0")}</div>
+      </div>
+      <div style={{fontSize:10,color:T.cream,lineHeight:1.5,marginBottom:8}}>{alert.msg}</div>
+      <div style={{display:"flex",gap:6}}>
+        <a href="tel:7709451466" style={{flex:1,textAlign:"center",background:T.sienna+"33",border:`1px solid ${T.sienna}44`,borderRadius:5,padding:5,color:T.sienna,fontSize:9,fontWeight:700,textDecoration:"none"}}>📞 Dam Hotline</a>
+        <a href="tel:911" style={{flex:1,textAlign:"center",background:T.danger+"33",border:`1px solid ${T.danger}44`,borderRadius:5,padding:5,color:T.danger,fontSize:9,fontWeight:700,textDecoration:"none"}}>🆘 911</a>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FISH LOG — Camera, GPS, Species ID, Map
+// ══════════════════════════════════════════════════════════════════════════════
+
+function FishLog(){
+  const[catches,setCatches]=useState([]);
+  const[showForm,setShowForm]=useState(false);
+  const[species,setSpecies]=useState("Rainbow Trout");
+  const[flyUsed,setFlyUsed]=useState("");
+  const[notes,setNotes]=useState("");
+  const[photo,setPhoto]=useState(null);
+  const[gps,setGps]=useState(null);
+  const fileRef=useRef(null);
+
+  useEffect(()=>{try{const v=localStorage.getItem("hooch-catches");if(v)setCatches(JSON.parse(v));}catch{}},[]);
+  useEffect(()=>{try{localStorage.setItem("hooch-catches",JSON.stringify(catches));}catch{}},[catches]);
+
+  const captureGps=()=>{if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>setGps({lat:p.coords.latitude,lon:p.coords.longitude}),()=>{},{enableHighAccuracy:true});};
+
+  const handlePhoto=(e)=>{
+    const file=e.target.files?.[0];if(!file)return;
+    captureGps();
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      // Compress to reasonable size
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement("canvas");
+        const max=600;let w=img.width,h=img.height;
+        if(w>max){h=h*(max/w);w=max;}if(h>max){w=w*(max/h);h=max;}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        setPhoto(canvas.toDataURL("image/jpeg",0.7));
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const save=()=>{
+    const entry={id:Date.now(),species,flyUsed,notes,photo,gps,date:new Date().toISOString(),nearestAccess:gps?nearestPt(gps.lat,gps.lon).point.shortName:"Unknown"};
+    setCatches(p=>[entry,...p]);setShowForm(false);setPhoto(null);setGps(null);setSpecies("Rainbow Trout");setFlyUsed("");setNotes("");
+  };
+
+  const del=(id)=>setCatches(p=>p.filter(c=>c.id!==id));
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:700,fontFamily:"'Playfair Display',serif",color:T.cream}}>🐟 Fish Log</div>
+        <button onClick={()=>{setShowForm(!showForm);if(!showForm)captureGps();}} style={{background:T.gold+"22",border:`1px solid ${T.gold}44`,borderRadius:5,color:T.gold,fontSize:9,padding:"5px 10px",cursor:"pointer",fontWeight:700}}>{showForm?"Cancel":"+ Log Catch"}</button>
+      </div>
+
+      {showForm&&(
+        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:14,marginBottom:14,animation:"fadeIn 0.2s ease"}}>
+          {/* Photo capture */}
+          <div onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${T.border}`,borderRadius:8,padding:photo?0:24,textAlign:"center",cursor:"pointer",marginBottom:10,overflow:"hidden",background:T.bgDeep}}>
+            {photo?<img src={photo} style={{width:"100%",borderRadius:6}} alt="Catch"/>:
+              <div><div style={{fontSize:24,marginBottom:4}}>📸</div><div style={{fontSize:11,color:T.creamDim}}>Tap to take photo or upload</div></div>}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{display:"none"}}/>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div>
+              <div style={{fontSize:8,color:T.textMuted,textTransform:"uppercase",marginBottom:3}}>Species</div>
+              <select value={species} onChange={e=>setSpecies(e.target.value)} style={{width:"100%",background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:4,color:T.cream,fontSize:11,padding:"6px 8px",fontFamily:"'DM Sans',sans-serif"}}>
+                {["Rainbow Trout","Brown Trout","Brook Trout","Shoal Bass","Largemouth Bass","Other"].map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:8,color:T.textMuted,textTransform:"uppercase",marginBottom:3}}>Fly Used</div>
+              <input value={flyUsed} onChange={e=>setFlyUsed(e.target.value)} placeholder="e.g., Zebra Midge #20" style={{width:"100%",background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:4,color:T.cream,fontSize:11,padding:"6px 8px",fontFamily:"'DM Sans',sans-serif"}}/>
+            </div>
+          </div>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:8,color:T.textMuted,textTransform:"uppercase",marginBottom:3}}>Notes</div>
+            <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Size, fight, conditions..." style={{width:"100%",background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:4,color:T.cream,fontSize:11,padding:"6px 8px",fontFamily:"'DM Sans',sans-serif"}}/>
+          </div>
+          {gps&&<div style={{fontSize:9,color:T.sage,marginBottom:8}}>📍 {gps.lat.toFixed(4)}, {gps.lon.toFixed(4)} · Near {nearestPt(gps.lat,gps.lon).point.shortName}</div>}
+          <button onClick={save} disabled={!photo} style={{width:"100%",background:photo?T.success+"22":"#333",border:`1px solid ${photo?T.success+"44":"#444"}`,borderRadius:6,color:photo?T.success:"#666",fontSize:11,padding:"8px",cursor:photo?"pointer":"default",fontWeight:700,fontFamily:"'Playfair Display',serif"}}>Save to Log</button>
+        </div>
+      )}
+
+      {/* Catch list */}
+      {catches.length===0&&!showForm&&<div style={{textAlign:"center",padding:20,color:T.textMuted,fontSize:11,fontStyle:"italic"}}>No catches logged yet. Get out there!</div>}
+      {catches.slice(0,10).map(c=>(
+        <div key={c.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:10,marginBottom:8,display:"flex",gap:10}}>
+          {c.photo&&<img src={c.photo} style={{width:60,height:60,objectFit:"cover",borderRadius:6,border:`1px solid ${T.border}`}} alt={c.species}/>}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:12,fontWeight:700,color:T.cream,fontFamily:"'Playfair Display',serif"}}>{c.species}</div>
+              <button onClick={()=>del(c.id)} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontSize:10}}>×</button>
+            </div>
+            <div style={{fontSize:9,color:T.creamDim}}>{c.flyUsed&&`${c.flyUsed} · `}{c.nearestAccess} · {new Date(c.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
+            {c.notes&&<div style={{fontSize:9,color:T.textMuted,fontStyle:"italic",marginTop:2}}>{c.notes}</div>}
+            {c.gps&&<div style={{fontSize:8,color:T.moss}}>📍 {c.gps.lat.toFixed(4)}, {c.gps.lon.toFixed(4)}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KNOT GUIDE
+// ══════════════════════════════════════════════════════════════════════════════
+
+function KnotGuide(){
+  const[openKnot,setOpenKnot]=useState(null);
+  return(
+    <div>
+      <div style={{fontSize:14,fontWeight:700,fontFamily:"'Playfair Display',serif",color:T.cream,marginBottom:12}}>🪢 Knot Reference</div>
+      {KNOTS.map(cat=>(
+        <div key={cat.category} style={{marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:2,marginBottom:6,borderBottom:`1px solid ${T.border}`,paddingBottom:4}}>{cat.category}</div>
+          {cat.knots.map(k=>(
+            <div key={k.name} style={{marginBottom:6}}>
+              <div onClick={()=>setOpenKnot(openKnot===k.name?null:k.name)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer"}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:T.cream,fontFamily:"'Playfair Display',serif"}}>{k.name}</div>
+                  <div style={{fontSize:9,color:T.textMuted}}>{k.use}</div>
+                </div>
+                <span style={{color:T.textMuted,fontSize:12,transition:"transform 0.2s",transform:openKnot===k.name?"rotate(180deg)":"none"}}>▾</span>
+              </div>
+              {openKnot===k.name&&(
+                <div style={{padding:"10px 12px",background:T.bgDeep,border:`1px solid ${T.border}`,borderTop:"none",borderRadius:"0 0 6px 6px",fontSize:10,color:T.creamDim,lineHeight:1.8}}>
+                  {k.steps.split(/(\d+\.)/).filter(Boolean).map((step,i)=>{
+                    if(/^\d+\.$/.test(step))return <span key={i} style={{color:T.gold,fontWeight:700}}>{step} </span>;
+                    return <span key={i}>{step}</span>;
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DAM SCHEDULE INPUT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function DamSchedulePanel({ schedule, setSchedule }) {
+  const [sH,setSH]=useState("7"),[sM,setSM]=useState("00"),[eH,setEH]=useState("9"),[eM,setEM]=useState("00");
+  const [open,setOpen]=useState(false);
+  const add = () => { const t=new Date(),s=new Date(t.getFullYear(),t.getMonth(),t.getDate(),+sH,+sM),e=new Date(t.getFullYear(),t.getMonth(),t.getDate(),+eH,+eM); if(e>s){setSchedule(p=>[...p,{start:s,end:e,id:Date.now()}]);setOpen(false);} };
+  const now=new Date();
+  const ss={background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:4,color:T.cream,fontSize:11,padding:"4px 6px",fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"};
+  return(
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:12,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:schedule.length||open?8:0}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif",display:"flex",alignItems:"center",gap:5}}>📋 Dam Schedule</div>
+          <div style={{fontSize:9,color:T.textMuted,marginTop:1}}><span style={{fontFamily:"'JetBrains Mono',monospace"}}>770-945-1466</span> · <span style={{fontFamily:"'JetBrains Mono',monospace"}}>855-DAM-FLOW</span> · 1610 AM</div>
+        </div>
+        <button onClick={()=>setOpen(!open)} style={{background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:5,color:T.sage,fontSize:9,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>{open?"Cancel":"+ Add"}</button>
+      </div>
+      {schedule.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:open?8:0}}>{schedule.sort((a,b)=>a.start-b.start).map(s=>{const a=now>=s.start&&now<=s.end,p=now>s.end;return <div key={s.id} style={{display:"flex",alignItems:"center",gap:4,background:a?T.sienna+"22":p?T.bgDeep:T.bgCard,border:`1px solid ${a?T.sienna+"44":T.border}`,borderRadius:5,padding:"2px 6px",fontSize:9,color:a?T.sienna:p?T.textMuted:T.cream,opacity:p?0.35:1}}>{a&&<Dot color={T.sienna} size={4} pulse/>}<span style={{fontFamily:"'JetBrains Mono',monospace"}}>{fmtTime(s.start.toISOString())}–{fmtTime(s.end.toISOString())}</span><button onClick={()=>setSchedule(pr=>pr.filter(x=>x.id!==s.id))} style={{background:"none",border:"none",color:T.textMuted,cursor:"pointer",fontSize:10,padding:0}}>×</button></div>})}</div>}
+      {open&&<div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}><span style={{fontSize:8,color:T.textMuted,fontWeight:700}}>FROM</span><select value={sH} onChange={e=>setSH(e.target.value)} style={ss}>{Array.from({length:24},(_,i)=><option key={i} value={i}>{i===0?"12a":i<12?`${i}a`:i===12?"12p":`${i-12}p`}</option>)}</select><select value={sM} onChange={e=>setSM(e.target.value)} style={ss}>{["00","15","30","45"].map(m=><option key={m} value={m}>:{m}</option>)}</select><span style={{fontSize:8,color:T.textMuted,fontWeight:700}}>TO</span><select value={eH} onChange={e=>setEH(e.target.value)} style={ss}>{Array.from({length:24},(_,i)=><option key={i} value={i}>{i===0?"12a":i<12?`${i}a`:i===12?"12p":`${i-12}p`}</option>)}</select><select value={eM} onChange={e=>setEM(e.target.value)} style={ss}>{["00","15","30","45"].map(m=><option key={m} value={m}>:{m}</option>)}</select><button onClick={add} style={{background:T.success+"22",border:`1px solid ${T.success}44`,borderRadius:5,color:T.success,fontSize:9,padding:"4px 8px",cursor:"pointer",fontWeight:700}}>Add</button></div>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ══════════════════════════════════════════════════════════════════════════════
+
+function HoochReport(){
+  const[gaugeData,setGaugeData]=useState({});
+  const[weather,setWeather]=useState(null);
+  const[loading,setLoading]=useState(true);
+  const[lastRefresh,setLastRefresh]=useState(null);
+  const[expandedCard,setExpandedCard]=useState(null);
+  const[schedule,setSchedule]=useState([]);
+  const[stocked,setStocked]=useState([]);
+  const[selDay,setSelDay]=useState(null);
+  const[tab,setTab]=useState("plan");
+
+  const fetchAll=useCallback(async()=>{setLoading(true);try{const gd={};const ps=Object.entries(USGS_GAUGES).map(async([k,g])=>{const[d,t]=await Promise.all([fetchUSGS(g.id,PARAM_CODES.discharge),fetchUSGS(g.id,PARAM_CODES.waterTemp)]);gd[k]={discharge:d,temp:t};});await Promise.all([...ps,fetchWeather().then(w=>setWeather(w))]);setGaugeData(gd);setLastRefresh(new Date());}catch(e){console.error(e);}finally{setLoading(false);}},[]);
+  useEffect(()=>{fetchAll();const iv=setInterval(fetchAll,5*60*1000);return()=>clearInterval(iv);},[fetchAll]);
+  useEffect(()=>{try{const v=localStorage.getItem("hooch-stk2");if(v)setStocked(JSON.parse(v));}catch{}},[]);
+  useEffect(()=>{try{localStorage.setItem("hooch-stk2",JSON.stringify(stocked));}catch{}},[stocked]);
+  useEffect(()=>{try{const v=localStorage.getItem("hooch-sch2");if(v)setSchedule(JSON.parse(v).map(s=>({...s,start:new Date(s.start),end:new Date(s.end)})));}catch{}},[]);
+  useEffect(()=>{try{localStorage.setItem("hooch-sch2",JSON.stringify(schedule));}catch{}},[schedule]);
+
+  const forecast=weather?buildWeekForecast(weather):[];
+  useEffect(()=>{if(forecast.length&&!selDay)setSelDay(forecast.find(d=>d.isToday)||forecast[0]);},[forecast,selDay]);
+
+  const damD=gaugeData?.bufordDam?.discharge;
+  const damCFS=damD?.length?parseFloat(damD[damD.length-1].value):null;
+  const damTrend=trendOf(damD);
+  const gen=damCFS!==null&&damCFS>900;
+
+  const best=forecast.filter(d=>!d.isToday).reduce((b,d)=>!b||d.score>b.score?d:b,null);
+  const month=new Date().getMonth()+1;
+
+  return(
+    <div style={{minHeight:"100vh",background:`radial-gradient(ellipse at top, ${T.bgCard}, ${T.bg} 50%, ${T.bgDeep})`,color:T.cream,fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${T.border};border-radius:2px}
+        body{font-family:'DM Sans',sans-serif}select,input{outline:none;font-family:'DM Sans',sans-serif}
+        /* Vintage paper texture overlay */
+        #root::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;opacity:0.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");z-index:1}
+      `}</style>
+
+      <div style={{maxWidth:720,margin:"0 auto",padding:"24px 16px 40px",position:"relative",zIndex:2}}>
+        {/* ── HEADER ── */}
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <Logo size={200}/>
+          <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,marginTop:8}}>
+            {lastRefresh&&<span style={{fontSize:8,color:T.textMuted}}>{fmtTime(lastRefresh.toISOString())}</span>}
+            <button onClick={fetchAll} disabled={loading} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:4,color:T.sage,fontSize:8,padding:"3px 8px",cursor:"pointer",fontWeight:600,opacity:loading?0.4:1}}>{loading?"···":"Refresh"}</button>
+          </div>
+        </div>
+
+        {/* ── DAM STATUS ── */}
+        <div style={{background:gen?"linear-gradient(135deg,#3a1a0f,#2a1208)":"linear-gradient(135deg,"+T.bgCard+","+T.bgDeep+")",border:`1px solid ${gen?T.sienna+"66":T.border}`,borderRadius:8,padding:"12px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:18}}>{gen?"⚡":"🌊"}</span>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,fontFamily:"'Playfair Display',serif",color:gen?T.sienna:T.success}}>{gen?"Dam Generating":"Base Flow"}</div>
+              <div style={{fontSize:9,color:T.textMuted}}>{damCFS!==null?`${Math.round(damCFS)} CFS · ${damTrend.label}`:"Loading..."}</div>
+            </div>
+          </div>
+          <div style={{fontSize:30,fontWeight:800,color:gen?T.sienna:T.success,fontFamily:"'JetBrains Mono',monospace"}}>{damCFS!==null?Math.round(damCFS):"—"}</div>
+        </div>
+
+        {/* ── TAB NAV ── */}
+        <div style={{display:"flex",gap:2,marginBottom:16,background:T.bgDeep,borderRadius:6,padding:2,border:`1px solid ${T.border}`}}>
+          {[{k:"plan",l:"Plan Trip",i:"📅"},{k:"live",l:"Live Gauges",i:"📊"},{k:"log",l:"Fish Log",i:"🐟"},{k:"knots",l:"Knots",i:"🪢"}].map(t=>
+            <button key={t.k} onClick={()=>setTab(t.k)} style={{flex:1,background:tab===t.k?T.bgCard:"transparent",border:"none",borderRadius:4,padding:"7px 4px",cursor:"pointer",fontSize:9,fontWeight:tab===t.k?700:500,color:tab===t.k?T.cream:T.textMuted,transition:"all 0.12s",fontFamily:"'DM Sans',sans-serif"}}>{t.i} {t.l}</button>
+          )}
+        </div>
+
+        {/* ════ PLAN TRIP TAB ════ */}
+        {tab==="plan"&&<>
+          {/* Week planner */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:2,marginBottom:8,fontFamily:"'Playfair Display',serif"}}>This Week</div>
+            <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4}}>
+              {forecast.slice(0,7).map(day=>{
+                const sl=selDay?.dateStr===day.dateStr;
+                const ib=best?.dateStr===day.dateStr;
+                const sc=day.score>=7?T.success:day.score>=5?T.sage:day.score>=3?T.warn:T.danger;
+                return(<div key={day.dateStr} onClick={()=>setSelDay(day)} style={{flex:"0 0 auto",width:76,background:sl?T.bgCard:T.bgDeep,border:`1px solid ${sl?T.borderLight:T.border}`,borderRadius:7,padding:"9px 7px",textAlign:"center",cursor:"pointer",position:"relative"}}>
+                  {ib&&<div style={{position:"absolute",top:-1,left:"50%",transform:"translateX(-50%)",background:T.success,color:T.bgDeep,fontSize:6,fontWeight:800,padding:"1px 5px",borderRadius:"0 0 3px 3px",letterSpacing:0.5}}>BEST</div>}
+                  <div style={{fontSize:8,color:sl?T.cream:T.textMuted,fontWeight:day.isToday?700:400}}>{day.isToday?"Today":day.isTomorrow?"Tmrw":day.dayName}</div>
+                  <div style={{fontSize:7,color:T.textMuted}}>{day.dateLabel}</div>
+                  <div style={{fontSize:18,margin:"2px 0"}}>{wxIcon(day.weatherCode)}</div>
+                  <div style={{fontSize:10,color:T.cream,fontFamily:"'JetBrains Mono',monospace"}}>{Math.round(day.tempMax)}°<span style={{color:T.textMuted}}>/</span>{Math.round(day.tempMin)}°</div>
+                  <div style={{fontSize:7,color:T.textMuted}}>{day.windMax>0?`${Math.round(day.windMax)}mph`:""}{day.precip>0?` ${day.precip}"`:""}</div>
+                  <div style={{height:3,borderRadius:2,background:T.border,overflow:"hidden",marginTop:3}}><div style={{height:"100%",width:`${day.score*10}%`,background:sc,borderRadius:2}}/></div>
+                  <div style={{fontSize:7,color:sc,fontWeight:700,marginTop:1}}>{day.score.toFixed(1)}</div>
+                </div>);
+              })}
+            </div>
+          </div>
+
+          {/* Day detail */}
+          {selDay&&(()=>{
+            const ck=selDay.conditionKey;const active=HATCHES.filter(h=>h.months.includes(month));
+            let verd,vc,vi;
+            if(selDay.score>=7){verd="Great fishing day";vc=T.success;vi="🎣";}
+            else if(selDay.score>=5){verd="Worth going";vc=T.sage;vi="👍";}
+            else if(selDay.score>=3){verd="Marginal";vc=T.warn;vi="⚠️";}
+            else{verd="Stay home";vc=T.danger;vi="🛑";}
+
+            const reasons=[];
+            if(selDay.precip>0.5)reasons.push(`${selDay.precip}" rain — water off-color`);
+            else if(selDay.precip>0.1)reasons.push(`Light rain — may trigger BWO hatches`);
+            if(selDay.precipPrior24h>0.5)reasons.push(`${selDay.precipPrior24h}" fell yesterday — clarity recovering`);
+            if(selDay.windMax>15)reasons.push(`${Math.round(selDay.windMax)} mph wind — casting difficult`);
+            else if(selDay.windMax<8)reasons.push("Light wind — good casting");
+            if(selDay.feelsMax<32)reasons.push(`Feels like ${Math.round(selDay.feelsMax)}°F — brutal`);
+            if(selDay.avgCloud>=60&&selDay.precip<0.2)reasons.push("Overcast — prime hatch weather");
+            if(selDay.weatherCode>=95)reasons.push("Thunderstorms — do not go");
+
+            return(
+              <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:16,marginBottom:14,animation:"fadeIn 0.2s ease"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:20}}>{vi}</span>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700,color:vc,fontFamily:"'Playfair Display',serif"}}>{verd}</div>
+                      <div style={{fontSize:9,color:T.textMuted}}>{selDay.isToday?"Today":selDay.dayName} · {selDay.dateLabel} · {wxLabel(selDay.weatherCode)}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}><div style={{fontSize:24,fontWeight:800,color:vc,fontFamily:"'JetBrains Mono',monospace"}}>{selDay.score.toFixed(1)}</div><div style={{fontSize:7,color:T.textMuted}}>FISH SCORE</div></div>
+                </div>
+
+                {/* Conditions */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:5,marginBottom:10}}>
+                  {[{l:"Feels",v:`${Math.round(selDay.feelsMax)}°`,c:selDay.feelsMax<35?T.danger:T.cream},{l:"Wind",v:`${Math.round(selDay.windMax)}mph`,c:selDay.windMax>15?T.danger:T.cream},{l:"Rain",v:selDay.precip>0?`${selDay.precip}"`:"-",c:selDay.precip>0.5?T.danger:T.cream},{l:"Sky",v:selDay.avgCloud>=70?"Overcast":selDay.avgCloud>=40?"Mixed":"Clear",c:T.cream}].map(({l,v,c})=>
+                    <div key={l} style={{background:T.bgDeep,borderRadius:5,padding:"6px 7px",borderTop:`2px solid ${T.border}`}}>
+                      <div style={{fontSize:7,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5}}>{l}</div>
+                      <div style={{fontSize:12,fontWeight:600,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</div>
+                    </div>)}
+                </div>
+
+                {/* Clarity */}
+                <div style={{display:"flex",gap:5,marginBottom:10}}>
+                  {[{l:"Upper",c:selDay.clarity.upper},{l:"Mid",c:selDay.clarity.mid},{l:"Lower",c:selDay.clarity.lower}].map(({l,c})=>
+                    <div key={l} style={{flex:1,background:T.bgDeep,borderRadius:5,padding:"5px 7px",borderLeft:`3px solid ${c.color}`}}>
+                      <div style={{fontSize:7,color:T.textMuted}}>{l}</div>
+                      <div style={{fontSize:10,fontWeight:600,color:c.color}}>{c.label}</div>
+                    </div>)}
+                </div>
+
+                {reasons.length>0&&<div style={{marginBottom:10}}>{reasons.map((r,i)=><div key={i} style={{fontSize:10,color:T.creamDim,lineHeight:1.6,paddingLeft:10,position:"relative"}}><span style={{position:"absolute",left:0,color:T.gold}}>·</span>{r}</div>)}</div>}
+
+                {/* Fly recommendations with sketches */}
+                <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10}}>
+                  <div style={{fontSize:10,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8,fontFamily:"'Playfair Display',serif"}}>
+                    🪰 Tie On — {ck==="stained"?"Stained Water":ck==="cold"?"Cold Front":ck==="overcast"?"Overcast":ck==="sunny"?"Bright Sun":""}
+                  </div>
+                  {active.slice(0,4).map(h=>{
+                    const rec=h.flies[ck];if(!rec||!rec.patterns.length)return null;
+                    return(<div key={h.name} style={{background:T.bgDeep,borderRadius:6,padding:10,marginBottom:6,borderLeft:`3px solid ${h.color}`}}>
+                      <div style={{fontSize:11,fontWeight:700,color:h.color,fontFamily:"'Playfair Display',serif",marginBottom:6}}>{h.name} <span style={{color:T.textMuted,fontWeight:400}}>({h.sizes})</span></div>
+                      <div style={{display:"flex",gap:6,marginBottom:6,overflowX:"auto",paddingBottom:4}}>
+                        {rec.patterns.map(p=><div key={p} style={{flex:"0 0 auto",textAlign:"center"}}><FlySketch name={p} size={52}/></div>)}
+                      </div>
+                      <div style={{fontSize:9,color:T.creamDim,fontStyle:"italic",lineHeight:1.5}}>{rec.tip}</div>
+                    </div>);
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          <GpsPanel gaugeData={gaugeData} schedule={schedule}/>
+          <DamSchedulePanel schedule={schedule} setSchedule={setSchedule}/>
+
+          {/* Stocking */}
+          <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",marginBottom:14,display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontSize:9,color:T.textMuted,fontWeight:600}}>🐟 Stocked:</span>
+            {["upper","mid","lower"].map(s=><button key={s} onClick={()=>setStocked(p=>p.includes(s)?p.filter(x=>x!==s):[...p,s])} style={{background:stocked.includes(s)?T.success+"18":"transparent",border:`1px solid ${stocked.includes(s)?T.success+"44":T.border}`,borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:8,fontWeight:600,color:stocked.includes(s)?T.success:T.textMuted}}>{s==="upper"?"Upper":s==="mid"?"Mid":"Lower"}{stocked.includes(s)?" ✓":""}</button>)}
+            <a href="https://georgiawildlife.com/sites/default/files/wrd/pdf/trout/Weekly_Stocking_Report.pdf" target="_blank" rel="noopener noreferrer" style={{fontSize:7,color:T.textMuted,textDecoration:"underline",marginLeft:2}}>GA DNR</a>
+          </div>
+
+          {/* Share */}
+          <ShareBtn gaugeData={gaugeData} forecast={forecast} selDay={selDay} best={best}/>
+        </>}
+
+        {/* ════ LIVE GAUGES TAB ════ */}
+        {tab==="live"&&<>
+          <div style={{fontSize:12,fontWeight:700,fontFamily:"'Playfair Display',serif",color:T.gold,marginBottom:10}}>Live Conditions by Access Point</div>
+          {ACCESS_POINTS.map((p,i)=>{
+            const gd=gaugeData[p.gauge]||{};const d=gd.discharge,t=gd.temp;
+            const cfs=d?.length?parseFloat(d[d.length-1].value):null;
+            const wt=t?.length?parseFloat(t[t.length-1].value):null;
+            const st=cfsToStatus(cfs,p.maxWadeCFS);const tr=trendOf(d);
+            const exp=expandedCard===p.name;
+            return(<div key={p.name} onClick={()=>setExpandedCard(exp?null:p.name)} style={{background:exp?T.bgCard:"#1e3025",border:`1px solid ${exp?T.borderLight:T.border}`,borderLeft:`3px solid ${st.color}`,borderRadius:6,padding:"10px 12px",cursor:"pointer",marginBottom:5,animation:`fadeIn 0.2s ease ${i*0.03}s both`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:11,fontWeight:600,color:T.cream}}>{p.shortName}{stocked.includes(p.section)&&<span style={{fontSize:7,color:T.success,marginLeft:4}}>STOCKED</span>}</div><div style={{fontSize:8,color:T.textMuted}}>RM {p.riverMile} · {p.travelMinFromDam>=0?`Pulse ${fmtShort(p.travelMinFromDam)}`:"Below Morgan Falls"}</div></div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:700,color:st.color,fontFamily:"'JetBrains Mono',monospace"}}>{cfs!==null?Math.round(cfs):"—"}</div><div style={{fontSize:7,color:T.textMuted}}>CFS <span style={{color:tr.t.includes("rising")?T.sienna:tr.t.includes("falling")?T.success:T.textMuted}}>{tr.arrow}</span></div></div>
+                  <div style={{background:`${st.color}18`,color:st.color,fontSize:7,fontWeight:700,padding:"2px 5px",borderRadius:3}}>{st.label}</div>
+                </div>
+              </div>
+              {exp&&<div onClick={e=>e.stopPropagation()} style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}`,fontSize:10,color:T.creamDim}}>
+                <div style={{display:"flex",gap:8,marginBottom:4}}><span>Water: {wt!==null?`${(wt*9/5+32).toFixed(1)}°F`:"-"}</span><span>·</span><span>Limit: {p.maxWadeCFS} CFS</span><span>·</span><span>{tr.label}</span></div>
+              </div>}
+            </div>);
+          })}
+        </>}
+
+        {/* ════ FISH LOG TAB ════ */}
+        {tab==="log"&&<FishLog/>}
+
+        {/* ════ KNOTS TAB ════ */}
+        {tab==="knots"&&<KnotGuide/>}
+
+        {/* ── FOOTER ── */}
+        <div style={{marginTop:20,textAlign:"center",borderTop:`1px solid ${T.border}`,paddingTop:12}}>
+          <div style={{fontSize:8,color:T.textMuted,lineHeight:1.7}}>
+            Dam: 770-945-1466 · 855-DAM-FLOW · 1610 AM<br/>
+            Data: USGS · Open-Meteo · GA DNR · River miles: GA River Guidebook<br/>
+            GA fishing license + trout stamp required · Wear a PFD · Fish safe
+          </div>
+          <div style={{fontSize:7,color:T.border,marginTop:6}}>Auto-refresh 5m · Not a substitute for the dam schedule</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareBtn({gaugeData,forecast,selDay,best}){
+  const[copied,setCopied]=useState(false);
+  const gen=()=>{const d=gaugeData?.bufordDam?.discharge;const c=d?.length?Math.round(parseFloat(d[d.length-1].value)):"?";const t=trendOf(d);const now=new Date();
+    let txt=`🪰 HOOCH REPORT · ${now.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}\n\nDam: ${c} CFS ${t.arrow}`;
+    if(selDay)txt+=`\n\n${selDay.isToday?"Today":selDay.dayName+" "+selDay.dateLabel}: Score ${selDay.score.toFixed(1)}/10\n${wxLabel(selDay.weatherCode)}, ${Math.round(selDay.tempMax)}°/${Math.round(selDay.tempMin)}°, Wind ${Math.round(selDay.windMax)}mph`;
+    if(best)txt+=`\n\n⭐ Best day: ${best.dayName} ${best.dateLabel} (${best.score.toFixed(1)}/10)`;
+    txt+=`\n\n770-945-1466 · Tight lines! 🎣`;return txt;};
+  const copy=async()=>{try{await navigator.clipboard.writeText(gen());setCopied(true);setTimeout(()=>setCopied(false),2000);}catch{}};
+  return <button onClick={copy} style={{background:copied?T.success+"18":T.bgCard,border:`1px solid ${copied?T.success+"33":T.border}`,borderRadius:6,color:copied?T.success:T.creamDim,fontSize:10,padding:"8px 14px",cursor:"pointer",fontWeight:600,width:"100%",marginBottom:14,fontFamily:"'Playfair Display',serif"}}>{copied?"✓ Copied!":"📤 Share Conditions Report"}</button>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<HoochReport />);
+  </script>
+</body>
+</html>
