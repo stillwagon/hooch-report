@@ -561,7 +561,7 @@ function HoochReport(){
   useEffect(()=>{fetchAll();const iv=setInterval(fetchAll,5*60*1000);return()=>clearInterval(iv);},[fetchAll]);
   useEffect(()=>{try{const v=localStorage.getItem("hooch-stk2");if(v)setStocked(JSON.parse(v));}catch{}},[]);
   useEffect(()=>{try{localStorage.setItem("hooch-stk2",JSON.stringify(stocked));}catch{}},[stocked]);
-  useEffect(()=>{try{const v=localStorage.getItem("hooch-sch2");if(v)setSchedule(JSON.parse(v).map(s=>{...s,start:new Date(s.start),end:new Date(s.end)}));}catch{}},[]);
+  useEffect(()=>{try{const v=localStorage.getItem("hooch-sch2");if(v)setSchedule(JSON.parse(v).map(s=>({...s,start:new Date(s.start),end:new Date(s.end)})));}catch{}},[]);
   useEffect(()=>{try{localStorage.setItem("hooch-sch2",JSON.stringify(schedule));}catch{}},[schedule]);
 
   const forecast=weather?buildWeekForecast(weather):[];
@@ -782,6 +782,7 @@ function ShareBtn({gaugeData,forecast,selDay,best}){
   const copy=async()=>{try{await navigator.clipboard.writeText(gen());setCopied(true);setTimeout(()=>setCopied(false),2000);}catch{}};
   return<button onClick={copy} style={{background:copied?T.success+"18":T.bgCard,border:`1px solid ${copied?T.success+"33":T.border}`,borderRadius:6,color:copied?T.success:T.creamDim,fontSize:10,padding:"8px 14px",cursor:"pointer",fontWeight:600,width:"100%",marginBottom:14,fontFamily:"'Playfair Display',serif"}}>{copied?"✓ Copied!":"📤 Share Conditions Report"}</button>;
 }
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(<HoochReport />);
   </script>
