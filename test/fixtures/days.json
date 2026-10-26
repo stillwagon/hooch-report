@@ -1,0 +1,102 @@
+{
+ "_note": "Saved sample days for regression-checking scoring. Daily weather metrics as produced by buildForecast for one section.",
+ "ice-storm": {
+  "tempMax": 31,
+  "tempMin": 27,
+  "feelsMax": 24,
+  "wind": 18,
+  "precip": 0.4,
+  "p24": 0.1,
+  "p48": 0.1,
+  "cloud": 100,
+  "wx": 66
+ },
+ "freezing-drizzle": {
+  "tempMax": 33,
+  "tempMin": 29,
+  "feelsMax": 30,
+  "wind": 16,
+  "precip": 0.15,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 100,
+  "wx": 56
+ },
+ "raw-overcast-calm": {
+  "tempMax": 34,
+  "tempMin": 26,
+  "feelsMax": 30,
+  "wind": 4,
+  "precip": 0.0,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 75,
+  "wx": 3
+ },
+ "bwo-perfect": {
+  "tempMax": 58,
+  "tempMin": 44,
+  "feelsMax": 56,
+  "wind": 5,
+  "precip": 0.0,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 75,
+  "wx": 3
+ },
+ "post-storm": {
+  "tempMax": 64,
+  "tempMin": 50,
+  "feelsMax": 63,
+  "wind": 8,
+  "precip": 0.0,
+  "p24": 1.6,
+  "p48": 2.0,
+  "cloud": 30,
+  "wx": 1
+ },
+ "summer-bluebird": {
+  "tempMax": 94,
+  "tempMin": 72,
+  "feelsMax": 99,
+  "wind": 5,
+  "precip": 0.0,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 10,
+  "wx": 0
+ },
+ "windy-cold-dry": {
+  "tempMax": 40,
+  "tempMin": 28,
+  "feelsMax": 33,
+  "wind": 22,
+  "precip": 0.0,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 20,
+  "wx": 1
+ },
+ "drizzly-mild": {
+  "tempMax": 55,
+  "tempMin": 48,
+  "feelsMax": 53,
+  "wind": 6,
+  "precip": 0.12,
+  "p24": 0.05,
+  "p48": 0.1,
+  "cloud": 95,
+  "wx": 61
+ },
+ "light-freezing-drizzle": {
+  "tempMax": 37,
+  "tempMin": 31,
+  "feelsMax": 34,
+  "wind": 8,
+  "precip": 0.05,
+  "p24": 0.0,
+  "p48": 0.0,
+  "cloud": 100,
+  "wx": 56
+ }
+}

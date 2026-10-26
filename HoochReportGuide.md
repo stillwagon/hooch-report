@@ -14,21 +14,26 @@ A personal web app for deciding **when, where, and with what** to fly fish the C
 - Live: `https://stillwagon.github.io/hooch-report/` (GitHub Pages, `main` branch, root)
 - Home location for drive times: Dunwoody, GA (~33.946, -84.335)
 
-## Current state (v10, April 2026)
+## Current state (v11, October 2026)
 
-- Single file: `index.html` loads React 18 + Babel standalone from cdnjs and compiles JSX **in the browser on every load**. Readable source: `hooch-v10.jsx`.
-- No build step, no tests. Persistence via `localStorage` (dam schedule entries).
-- History: built iteratively in claude.ai chat (v1–v10). Many deployment failures came from hand-assembling the HTML; avoid repeating that.
+- Vite + React, precompiled. `npm run dev` / `npm test` / `npm run build`. No in-browser Babel.
+- Layout: `src/data` (river model, flies, travel times), `src/lib` (pure logic: scoring, pulse, generation detection, series, stocking parser, ICS), `src/fetchers` (USGS, Open-Meteo, same-origin data + optional Worker), `src/ui` (React).
+- Tests: Vitest in `test/`. Saved sample days in `test/fixtures/days.json`; `npm run fixtures` prints v10-vs-v11 headline, fish and "you" scores.
+- Deploy: `.github/workflows/deploy.yml` tests, fetches server-side data, builds and publishes to Pages on every push to `main` and every 3 hours. **Pages source must be set to "GitHub Actions"** (Settings → Pages).
+- Server-side data: `scripts/fetch-data.mjs` runs in the deploy workflow and writes `data/stocking.json`, `data/extras.json` (BacteriALERT) and `data/probe.json` (what the USACE and BacteriALERT pages return to a server) next to the site.
+- Optional Worker (`worker/`): caches USGS gauges and serves `alarm.ics`. Set repo variable `WORKER_URL` to enable it. The app works without it.
+- PWA: manifest + service worker; last-known data cached in `localStorage`.
+- Persistence: manual dam schedule entries (`hooch:schedule:v11`), data cache (`hooch:cache:v11`).
 
 ## Data sources
 
 | Data | Source | Notes |
 |---|---|---|
-| Flow, water temp | USGS — **currently** `waterservices.usgs.gov/nwis/iv` | **Being decommissioned Feb 22, 2027; degradation starts Nov 2026.** Migrate to `api.waterdata.usgs.gov/ogcapi/v1`. |
-| Turbidity | USGS param `63680` (BacteriALERT stations) | Not yet used. Real measurement to replace the modeled clarity. |
-| Weather | Open-Meteo forecast API | Currently one point (33.93, -84.35). Uses `apparent_temperature_*` for feels-like. Supports multiple locations per call. |
-| Stocking | GA DNR weekly PDF: `https://georgiawildlife.com/sites/default/files/wrd/pdf/trout/Weekly_Stocking_Report.pdf` | Fetched via free CORS proxies + raw-byte scan. **Almost certainly never worked** (PDF text is compressed). Needs real PDF text extraction, ideally server-side. |
-| Dam schedule | Manual entry. Source: `https://spatialdata.usace.army.mil/hydropower/` (select "Buford Dam / Lake Sidney Lanier"); hotline 770-945-1466 | Browser can't read the USACE page (CORS). A server-side fetch is untested and worth trying. |
+| Flow, water temp, turbidity | USGS Water Data OGC API, `api.waterdata.usgs.gov/ogcapi/v0/collections/continuous/items` (v1 tried next), legacy `waterservices.usgs.gov` as last fallback until Feb 22, 2027 | One request per site/param (11 per refresh, every 10 min). The working base is remembered. Worker cache reduces this to one request. |
+| Turbidity / E. coli | USGS `63680` at Norcross, Powers Ferry, Atlanta; BacteriALERT page `ga.water.usgs.gov/bacteria/` | Turbidity drives measured clarity for today on the mid/lower river. E. coli is parsed best-effort at build time; otherwise a rough flag at ≥30 FNU. |
+| Weather | Open-Meteo, one call with three points (upper Hwy 20, mid Jones Br., lower Powers Is.) | Each section scored separately; day headline = best section. |
+| Stocking | GA DNR weekly PDF | Parsed in GitHub Actions with real PDF text extraction (unpdf) → `data/stocking.json`. Browser fallback (CORS proxy + lazy-loaded unpdf) if that file is missing or >3 days old. The UI shows the matched report lines. |
+| Dam schedule | Releases **auto-detected** from the Buford gauge; manual entry for future releases. USACE page + hotline 770-945-1466 | `data/probe.json` records whether a server can read the USACE page and which data URLs it loads. |
 
 USGS gauges and parameter codes:
 
@@ -42,7 +47,10 @@ USGS gauges and parameter codes:
 
 13 access points with NPS river miles (GA River Guidebook): Buford Dam (349), Bowmans Is. (348), Hwy 20 (346), Settles Br. (344), McGinnis (340), Abbotts Br. (335), Medlock Br. (331), Jones Br. (328), Island Ford (320), Morgan Falls (313), Johnson Fy. (311), Powers Is. (307), Paces Mill (304). Full table, regs, and notes are in the `SPOTS` array in the source.
 
-- **Pulse travel times** from Buford release are stored per spot (`pulse`, minutes). Values are **unverified estimates** (e.g., Hwy 20 = 50, Jones Br. = 390, Morgan Falls = 720).
+- **Pulse travel times** from Buford release are stored per spot (`pulse`, minutes). Values are **unverified estimates** (e.g., Hwy 20 = 50, Jones Br. = 390, Morgan Falls = 720) until calibrated. Run the **Calibrate travel times** workflow (Actions tab). It measures half-height rise and fall lags at Norcross, Powers Ferry and Atlanta across past releases and pushes `src/data/travel.js` to the `calibrate-travel` branch for review. Once calibrated, spot lags are interpolated by river mile and the "(est.)" labels go away.
+- **High water** lasts from release start + lag until release end + tail lag; the falling limb ("prime time") is the 2 h after that. A release still running has no known end, so the spot stays high.
+- **Flow at a spot** = nearest upstream gauge read `lag difference` minutes ago, compared with that gauge's own 7-day base flow (15th percentile): ≤1.3× at base, ≤1.8× slightly up, ≤3× up, more is blown. Future days show "Flow TBD" unless releases are entered for that day.
+- **Drive times** are a static table from home (`drive` in `SPOTS`, off-peak estimates; correct them from experience). Each spot has a Directions link to Apple Maps with live traffic.
 - **Morgan Falls is run-of-river**, so Buford releases pass through to the lower river. Lower sites use the Buford schedule with roughly 12-hour travel. There is no separate Morgan Falls schedule.
 - Delayed Harvest (lower river): Nov 1 – May 14, catch-and-release, single-hook artificial.
 
@@ -55,35 +63,23 @@ USGS gauges and parameter codes:
 - Spot rankings combine flow vs. wading limit, clarity, water temperature (trout optimum 50–65°F, heavy penalty above 68°F), stocking, dam pulse timing, weekend crowding, and condition-specific bonuses.
 - Ranked list shows top 5 by default with an expand control to see all 13, each with up to 3 short reasons (e.g., "Ideal flow · Clear water · Stocked Wed").
 
-## Known issues (from Oct 2026 review), in priority order
+## Scoring (v11)
 
-1. **USGS migration** to the new Water Data API before service degrades.
-2. **On-River Mode alerts don't fire with the phone locked** (iOS suspends web GPS/timers). Fix: a "Set alarm" action that creates a calendar event alerting 30 min before the pulse reaches the chosen spot.
-3. **Stocking parser is broken** (see Data sources).
-4. **Pulse logic bug:** spots are marked "water high" for only 60 min after pulse arrival, then "falling limb." High water should last from arrival until generation end + travel time.
-5. **Drive-time formula is wrong** (assumes 25 mph; shows Buford Dam at 68 min, realistically ~35–40). Replace with a static table of real drive times from home plus a "Directions" link to Maps.
-6. Clarity is modeled from one rain gauge point; use measured turbidity instead.
-7. Generation isn't auto-detected; the Buford gauge shows releases within minutes, so detect the step-up and propagate the pulse automatically. Keep manual entry for future releases.
-8. Wading thresholds are fixed guesses and misfire on the Atlanta gauge. Compare each gauge to its own recent base flow instead.
-9. Future-day rankings use today's flow as if it were known. Rank future days without flow, or label flow unknown.
-10. Weather comes from one point. Pull upper/mid/lower separately.
-11. Day score blends angler comfort with fish activity. Keep the headline rule above, but show "fish" and "comfort" subscores.
+- Headline day score is the v10 rule set (now also counts WMO 56/57 freezing drizzle as freezing precipitation). Under it: **Fish** (clouds, clarity, rain; air temperature matters little in a 50s tailwater) and **You** (feels-like, wind, precipitation).
+- Spot reasons put the pulse note first so it is never hidden.
+- Clarity: measured turbidity (≤8 FNU clear, ≤20 clearing, ≤50 stained, ≤150 muddy) for today on mid/lower; rainfall model otherwise.
+- Delayed Harvest uses the real dates (Nov 1 – May 14).
 
-## Proposed v11 scope
+## Still open
 
-Items 1–4 above, plus measured turbidity (6), auto-detected generation (7), relative flow thresholds (8), and a restructured build:
-
-- Precompile instead of in-browser Babel.
-- Split into modules: data, fetchers, scoring, UI.
-- Add a small set of saved sample days (fixture data) to regression-test scoring.
-- GitHub Action builds and deploys to Pages on push to `main`.
-
-Travel-time calibration from historical USGS hydrographs can follow once the new API is wired in.
+- Travel times: run the calibration workflow and review the result. Gauge river miles in `GAUGES` are approximate.
+- Drive times: the table is an estimate; adjust from real trips.
+- BacteriALERT and USACE parsing: check `https://stillwagon.github.io/hooch-report/data/probe.json` after the first deploy and write real parsers against what comes back.
+- New USGS API: query shape follows the published docs, but it hasn't been checked against the live service from this environment. If `Live Gauges` shows "USGS legacy" as the source, the OGC request needs adjusting. Consider an API key if rate limits bite.
 
 ## Possible later work
 
-- Small Cloudflare Worker on a schedule: parse stocking PDF, cache gauge data, test reading the USACE schedule server-side.
-- Installable home-screen app (PWA) with last-known data cached for weak-signal access points.
+- Use live downstream gauges to confirm pulse arrival in real time (Norcross/Powers Ferry/Atlanta see the rise directly).
 - One-tap "how'd it fish (1–5)" after a trip, to calibrate scoring weights.
 - Automated dam schedule via phone call + transcription (Twilio). **Parked**; don't build unless asked.
 
@@ -91,8 +87,7 @@ Travel-time calibration from historical USGS hydrographs can follow once the new
 
 - SVG fly illustrations (unreadable). Fly names link to Google Images search instead.
 - Fish Log with camera (removed to simplify).
-
-Candidates to remove, pending confirmation from the user: canvas share card (app is personal-only now) and the knots reference.
+- Canvas share card and the knots reference (removed in v11; personal use only).
 
 ## UX conventions
 
