@@ -1,0 +1,6 @@
+node_modules/
+dist/
+worker/node_modules/
+worker/.wrangler/
+.DS_Store
+public/data/
